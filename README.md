@@ -1,5 +1,4 @@
 # My bashrc
 
-
-This aims to track my ~./bashrc bindings 
+This repo aims to track my ~./bashrc bindings 
 
