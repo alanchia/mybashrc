@@ -16,6 +16,9 @@ __fzf_cd__() {
 
 bind -x '"\C-f": __fzf_cd__'
 
+
+# Set the following in vscode > Settings (UI) > FontFamily
+# 'JetBrainsMono Nerd Font Mono'
 # Path is a git repository
 export FANCYGIT_ICON_GIT_REPO=""
 
