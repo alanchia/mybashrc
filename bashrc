@@ -65,15 +65,18 @@ export FZF_DEFAULT_OPTS="
 
 rgg() {
   if [ -z "$1" ]; then
-    echo "Usage: rgg <search_term>"
+    echo "Usage: rgg <search_term> [search_path]"
     return 1
   fi
 
-rg --no-heading --line-number "$1" 2>/dev/null \
-  | fzf --delimiter : \
-        --preview 'bat --color=always --style=numbers --highlight-line {2} --line-range {2}:+10 {1}' \
-        --preview-window=right:60%:wrap \
-        --bind 'enter:execute(vim {1} +{2})'
+  local search_term="$1"
+  local search_path="${2:-.}"
+
+  rg --no-heading --line-number "$search_term" "$search_path" 2>/dev/null \
+    | fzf --delimiter : \
+          --preview 'bat --color=always --style=numbers --highlight-line {2} --line-range {2}:+10 {1}' \
+          --preview-window=right:60%:wrap \
+          --bind 'enter:execute(vim {1} +{2})'
 }
 
 alias rgf='rgg'
