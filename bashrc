@@ -48,3 +48,32 @@ export FANCYGIT_ICON_HAS_UNPUSHED_COMMITS=" "
 
 # Path is a python virtual environment
 export FANCYGIT_ICON_VENV=" "
+
+
+
+
+export FZF_DEFAULT_OPTS="
+--preview 'bat --color=always --style=numbers --line-range :500 {}' \
+--preview-window=right:60%:wrap \
+--bind 'pgup:preview-page-up' \
+--bind 'pgdn:preview-page-down' \
+--bind 'alt-up:preview-up' \
+--bind 'alt-down:preview-down' \
+--bind 'alt-u:preview-page-up' \
+--bind 'alt-d:preview-page-down'"
+
+
+rgg() {
+  if [ -z "$1" ]; then
+    echo "Usage: rgg <search_term>"
+    return 1
+  fi
+
+rg --no-heading --line-number "$1" 2>/dev/null \
+  | fzf --delimiter : \
+        --preview 'bat --color=always --style=numbers --highlight-line {2} --line-range {2}:+10 {1}' \
+        --preview-window=right:60%:wrap \
+        --bind 'enter:execute(vim {1} +{2})'
+}
+
+alias rgf='rgg'
