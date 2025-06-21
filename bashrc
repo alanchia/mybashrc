@@ -1,5 +1,5 @@
 
-
+alias gs="git status"
 alias gad="git add . -A"
 alias gci="git commit -m "
 alias gciao="git commit --amend --no-edit"
