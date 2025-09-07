@@ -18,12 +18,23 @@ parse_git_branch() {
     staged=""
     dirty=""
     untracked=""
+    ahead_behind=""
 
     git diff --cached --quiet 2>/dev/null || staged="${green}+${reset}"
     git diff --quiet 2>/dev/null || dirty="${red}*${reset}"
     [ -n "$(git ls-files --others --exclude-standard)" ] && untracked="${blue}?${reset}"
 
-    echo "(${branch}${staged}${dirty}${untracked})"
+    # Ahead/behind check
+    remote=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null)
+    if [ -n "$remote" ]; then
+        ahead=$(git rev-list --count HEAD ^"$remote" 2>/dev/null)
+        behind=$(git rev-list --count "$remote" ^HEAD 2>/dev/null)
+
+        [ "$ahead" -gt 0 ] && ahead_behind="${ahead_behind}${green}↑${ahead}${reset}"
+        [ "$behind" -gt 0 ] && ahead_behind="${ahead_behind}${red}↓${behind}${reset}"
+    fi
+
+    echo "(${branch}${staged}${dirty}${untracked}${ahead_behind})"
 }
 
 # Fancy prompt function
