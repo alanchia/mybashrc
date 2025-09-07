@@ -4,7 +4,7 @@ green='\[\e[32m\]'
 yellow='\[\e[33m\]'
 blue='\[\e[34m\]'
 magenta='\[\e[35m\]'
-cyan='\[\e[36m\]'
+cyan='\[\e[36;1m\]'   # bold cyan for branch
 white='\[\e[37m\]'
 reset='\[\e[0m\]'
 
@@ -34,7 +34,7 @@ parse_git_branch() {
         [ "$behind" -gt 0 ] && ahead_behind="${ahead_behind}${red}↓${behind}${reset}"
     fi
 
-    echo "(${branch}${staged}${dirty}${untracked}${ahead_behind})"
+    echo "(${cyan}${branch}${reset}${staged}${dirty}${untracked}${ahead_behind})"
 }
 
 # Fancy prompt function
@@ -51,13 +51,13 @@ set_bash_prompt() {
     # Build git segment
     git_info=$(parse_git_branch)
     if [ -n "$git_info" ]; then
-        git_segment=" ${yellow}${git_info}${reset}"
+        git_segment=" ${git_info}"
     else
         git_segment=""
     fi
 
     # Final PS1
-    PS1=" ${penguin} ${cyan}\w${reset}${git_segment} ${magenta}➜${reset} "
+    PS1=" ${penguin} ${white}\w${reset}${git_segment} ${magenta}➜${reset} "
 }
 
 PROMPT_COMMAND=set_bash_prompt
