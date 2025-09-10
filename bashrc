@@ -1,10 +1,10 @@
 
 if [ -f "$HOME/.bash_profile" ]; then
-  . ~/.bash_profile
+  . $HOME/.bash_profile
 fi 
 
 
-if [ -f "$HOME/.bash_alias" ]; then
-  . ~/.bash_alias
+if [ -f "$HOME/.bash_aliases" ]; then
+  . $HOME/.bash_alias
 fi 
 
