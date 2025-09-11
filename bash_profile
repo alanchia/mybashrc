@@ -57,8 +57,12 @@ set_bash_prompt() {
     fi
 
     # Final PS1
-    PS1=" ${penguin} ${white}\w${reset}${git_segment} ${magenta}➜${reset} "
+    PS1=" ${penguin} ${blue}\u${reset}@${green}\h${reset} ${white}\w${reset}${git_segment} ${magenta}➜${reset} "
 }
 
 PROMPT_COMMAND=set_bash_prompt
+
+if [ -f "$HOME/.bash_aliases" ]; then
+  . $HOME/.bash_aliases 
+fi
 
