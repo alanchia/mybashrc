@@ -56,8 +56,15 @@ set_bash_prompt() {
         git_segment=""
     fi
 
+    # Conda environment segment (show only when active)
+    if [ -n "${CONDA_DEFAULT_ENV:-}" ]; then
+        conda_segment=" ${yellow}(${CONDA_DEFAULT_ENV})${reset}"
+    else
+        conda_segment=""
+    fi
+
     # Final PS1
-    PS1=" ${penguin} ${blue}\u${reset}@${green}\h${reset} ${white}\w${reset}${git_segment} ${magenta}➜${reset} "
+    PS1=" ${penguin} ${blue}\u${reset}@${green}\h${reset}${conda_segment} ${white}\w${reset}${git_segment} ${magenta}➜${reset} "
 }
 
 PROMPT_COMMAND=set_bash_prompt
@@ -73,3 +80,4 @@ fi
 if [ -f "$HOME/.bash_aliases" ]; then
   . $HOME/.bash_aliases
 fi
+
