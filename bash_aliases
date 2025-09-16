@@ -5,6 +5,7 @@ alias gciao="git commit --amend --no-edit"
 alias gp="git push"
 alias ta="tmux attach -t main-window"
 alias tan="tmux -u new -s main-window"
+alias gdir="cd ~/git && ls"
 
 alias k="kubectl"
 
