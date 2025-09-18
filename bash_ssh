@@ -1,10 +1,131 @@
-if [ -S "$SSH_AUTH_SOCK" ] && [ "$SSH_AUTH_SOCK" != "$HOME/.ssh/agent.sock" ]; then
+# Enable debug mode if SSH_DEBUG is set
+debug() {
+    if [ -n "$SSH_DEBUG" ]; then
+        echo "DEBUG: $1" >&2
+    fi
+}
+
+# Try to find and set up the SSH agent socket
+find_ssh_agent() {
+    debug "Starting find_ssh_agent"
+    debug "Current SSH_AUTH_SOCK: $SSH_AUTH_SOCK"
+    
+    # VS Code specific check - if we're in VS Code integrated terminal
+    if [ -n "$VSCODE_IPC_HOOK_CLI" ]; then
+        debug "Running in VS Code integrated terminal"
+        # Try to get SSH_AUTH_SOCK from parent tmux session if we're in one
+        if [ -n "$TMUX" ]; then
+            debug "Inside tmux session"
+            local tmux_ssh_sock=$(tmux show-environment | grep "^SSH_AUTH_SOCK=" | cut -d = -f 2)
+            if [ -n "$tmux_ssh_sock" ] && [ -S "$tmux_ssh_sock" ]; then
+                debug "Found working tmux SSH socket: $tmux_ssh_sock"
+                echo "$tmux_ssh_sock"
+                return 0
+            fi
+            debug "No working tmux SSH socket found"
+        fi
+    fi
+
+    # Check common socket locations
+    local socket_locations=(
+        "$SSH_AUTH_SOCK"                          # Current SSH_AUTH_SOCK
+        "/tmp/ssh-*/agent.*"                      # Common SSH agent socket pattern
+        "$HOME/.vscode-server/bin/*/alpine-*/ssh-*agent.sock" # VS Code remote SSH agent
+        "$XDG_RUNTIME_DIR/ssh-agent.socket"       # systemd user socket
+        "/var/run/ssh-agent.socket"               # Some RHEL/AlmaLinux locations
+        "/run/user/$UID/keyring/ssh"              # GNOME keyring SSH agent socket
+        "$HOME/.ssh/agent.sock"                   # Our persistent socket location
+    )
+    debug "Checking socket locations: ${socket_locations[*]}"
+
+    # First try the explicitly set SSH_AUTH_SOCK if it exists
+    if [ -n "$SSH_AUTH_SOCK" ] && [ -S "$SSH_AUTH_SOCK" ]; then
+        debug "Testing current SSH_AUTH_SOCK: $SSH_AUTH_SOCK"
+        SSH_AUTH_SOCK="$SSH_AUTH_SOCK" ssh-add -l >/dev/null 2>&1
+        if [ $? -ne 2 ]; then
+            debug "Current SSH_AUTH_SOCK is working"
+            echo "$SSH_AUTH_SOCK"
+            return 0
+        else
+            debug "Current SSH_AUTH_SOCK exists but is not working"
+        fi
+    fi
+
+    # Then try to find other potential sockets
+    for socket in "${socket_locations[@]}"; do
+        # Use find to expand globs and check for socket files
+        while IFS= read -r sock; do
+            if [ -S "$sock" ] && [ -r "$sock" ]; then  # Check if socket exists and is readable
+                # Test if the socket is actually working
+                SSH_AUTH_SOCK="$sock" ssh-add -l >/dev/null 2>&1
+                if [ $? -ne 2 ]; then  # Return code 2 means definitely not working
+                    echo "$sock"
+                    return 0
+                fi
+            fi
+        done < <(find ${socket%/*} -path "$socket" -type s 2>/dev/null || true)
+    done
+
+    # If no working socket found, check if we need to start ssh-agent
+    if ! pgrep ssh-agent >/dev/null; then
+        eval $(ssh-agent -s) >/dev/null
+        echo "$SSH_AUTH_SOCK"
+        return 0
+    fi
+
+    return 1
+}
+
+# Set up SSH agent socket
+setup_ssh_agent() {
+    debug "Starting setup_ssh_agent"
     mkdir -p "$HOME/.ssh"
-    # Only recreate the symlink if it points to a different target
-    current_target=$(readlink "$HOME/.ssh/agent.sock" 2>/dev/null || true)
-    if [ "$current_target" != "$SSH_AUTH_SOCK" ]; then
+    
+    # Find a working SSH agent socket
+    if found_socket=$(find_ssh_agent); then
+        debug "Found working socket: $found_socket"
+        # Only recreate the symlink if it points to a different target
+        current_target=$(readlink "$HOME/.ssh/agent.sock" 2>/dev/null || true)
+        debug "Current symlink target: $current_target"
+        
+        if [ "$current_target" != "$found_socket" ]; then
+            debug "Updating symlink to point to new socket"
+            ln -snf "$found_socket" "$HOME/.ssh/agent.sock"
+        fi
+        export SSH_AUTH_SOCK="$HOME/.ssh/agent.sock"
+        
+        # Verify the socket is working
+        if ! ssh-add -l >/dev/null 2>&1; then
+            debug "Socket verification failed, restarting ssh-agent"
+            # If not working, try to restart ssh-agent
+            eval $(ssh-agent -s) >/dev/null
+            ln -snf "$SSH_AUTH_SOCK" "$HOME/.ssh/agent.sock"
+            debug "New SSH_AUTH_SOCK after restart: $SSH_AUTH_SOCK"
+        else
+            debug "Socket verification successful"
+        fi
+    else
+        debug "No working socket found"
+        # Start new agent if none found
+        debug "Starting new ssh-agent"
+        eval $(ssh-agent -s) >/dev/null
         ln -snf "$SSH_AUTH_SOCK" "$HOME/.ssh/agent.sock"
     fi
-    export SSH_AUTH_SOCK="$HOME/.ssh/agent.sock"
+}
+
+# Only run setup if needed
+if [ "$SSH_AUTH_SOCK" != "$HOME/.ssh/agent.sock" ]; then
+    debug "SSH_AUTH_SOCK ($SSH_AUTH_SOCK) differs from agent.sock, running setup"
+    setup_ssh_agent
+else
+    debug "SSH_AUTH_SOCK already points to agent.sock"
+    # Verify the current socket is still working
+    if ! ssh-add -l >/dev/null 2>&1; then
+        debug "Current socket not working, running setup"
+        setup_ssh_agent
+    fi
 fi
+
+# Enable debugging with: export SSH_DEBUG=1
+# Disable debugging with: unset SSH_DEBUG
 
