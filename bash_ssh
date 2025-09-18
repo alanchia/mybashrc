@@ -5,6 +5,11 @@ debug() {
     fi
 }
 
+# Initial debug test
+debug "bash_ssh script starting up"
+debug "SSH_DEBUG=${SSH_DEBUG:-not set}"
+debug "Current shell: $SHELL"
+
 # Try to find and set up the SSH agent socket
 find_ssh_agent() {
     debug "Starting find_ssh_agent"
