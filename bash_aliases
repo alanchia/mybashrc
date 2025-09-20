@@ -6,6 +6,7 @@ alias gp="git push"
 alias ta="tmux attach -t main-window"
 alias tan="tmux -u new -s main-window"
 alias gdir="cd ~/git && ls"
+alias ls="ls --color"
 
 alias k="kubectl"
 
