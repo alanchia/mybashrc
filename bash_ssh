@@ -32,7 +32,15 @@ find_ssh_agent() {
     fi
 
     # Check common socket locations
+    # First try to get the saved socket path
+    local saved_sock=""
+    if [ -f "$HOME/.ssh/agent/ssh-auth-sock" ]; then
+        saved_sock=$(cat "$HOME/.ssh/agent/ssh-auth-sock")
+        debug "Found saved socket path: $saved_sock"
+    fi
+    
     local socket_locations=(
+        "$saved_sock"                             # Our saved socket path
         "$SSH_AUTH_SOCK"                          # Current SSH_AUTH_SOCK
         "/tmp/ssh-*/agent.*"                      # Common SSH agent socket pattern
         "$HOME/.vscode-server/bin/*/alpine-*/ssh-*agent.sock" # VS Code remote SSH agent
@@ -83,13 +91,62 @@ find_ssh_agent() {
     return 1
 }
 
+# Update tmux environment with current SSH_AUTH_SOCK
+update_tmux_env() {
+    if [ -n "$TMUX" ]; then
+        debug "Updating tmux SSH_AUTH_SOCK environment"
+        tmux set-environment SSH_AUTH_SOCK "$SSH_AUTH_SOCK"
+    fi
+}
+
 # Set up SSH agent socket
 setup_ssh_agent() {
     debug "Starting setup_ssh_agent"
     
+    # Create a persistent directory for SSH agent socket
+    mkdir -p "$HOME/.ssh/agent"
+    
+    # If we're reconnecting and have a saved socket, try that first
+    if [ -f "$HOME/.ssh/agent/ssh-auth-sock" ]; then
+        saved_sock=$(cat "$HOME/.ssh/agent/ssh-auth-sock")
+        debug "Found saved socket: $saved_sock"
+        if [ -S "$saved_sock" ]; then
+            debug "Testing saved socket"
+            SSH_AUTH_SOCK="$saved_sock" ssh-add -l >/dev/null 2>&1
+            if [ $? -ne 2 ]; then
+                debug "Saved socket is working"
+                export SSH_AUTH_SOCK="$saved_sock"
+                update_tmux_env
+                return 0
+            fi
+        fi
+    fi
+    
+    # Always check the current SSH_AUTH_SOCK first on reconnection
+    if [ -n "$SSH_CONNECTION" ] && [ -n "$SSH_AUTH_SOCK" ]; then
+        debug "Testing current SSH_AUTH_SOCK: $SSH_AUTH_SOCK"
+        if [ -S "$SSH_AUTH_SOCK" ]; then
+            ssh-add -l >/dev/null 2>&1
+            if [ $? -ne 2 ]; then
+                debug "Current SSH_AUTH_SOCK is working"
+                echo "$SSH_AUTH_SOCK" > "$HOME/.ssh/agent/ssh-auth-sock"
+                export SSH_AUTH_SOCK
+                update_tmux_env
+                return 0
+            fi
+        fi
+    fi
+    
     # If we're in an SSH session with agent forwarding enabled
     if [ -n "$SSH_CONNECTION" ] && [ -n "$SSH_AUTH_SOCK" ]; then
         debug "SSH connection detected with auth sock: $SSH_AUTH_SOCK"
+        # Save the socket path to a persistent location
+        echo "$SSH_AUTH_SOCK" > "$HOME/.ssh/agent/ssh-auth-sock"
+        # Update tmux environment if we're in tmux
+        if [ -n "$TMUX" ]; then
+            debug "Updating tmux SSH_AUTH_SOCK"
+            tmux set-environment SSH_AUTH_SOCK "$SSH_AUTH_SOCK"
+        fi
         # Resolve the real path of SSH_AUTH_SOCK to avoid symlink loops
         real_auth_sock=$(readlink -f "$SSH_AUTH_SOCK" 2>/dev/null || echo "$SSH_AUTH_SOCK")
         debug "Resolved real socket path: $real_auth_sock"
@@ -129,6 +186,18 @@ setup_ssh_agent() {
     return 0
 }
 
+# Clean up stale socket files
+cleanup_stale_sockets() {
+    debug "Cleaning up stale socket files"
+    if [ -f "$HOME/.ssh/agent/ssh-auth-sock" ]; then
+        local saved_sock=$(cat "$HOME/.ssh/agent/ssh-auth-sock")
+        if [ ! -S "$saved_sock" ]; then
+            debug "Removing stale socket reference"
+            rm -f "$HOME/.ssh/agent/ssh-auth-sock"
+        fi
+    fi
+}
+
 # Enable debug logging if requested
 if [ -n "$SSH_DEBUG" ]; then
     debug "Running setup_ssh_agent with debugging enabled"
@@ -136,5 +205,16 @@ else
     debug "Running setup_ssh_agent (debugging disabled)"
 fi
 
+# Clean up stale sockets first
+cleanup_stale_sockets
+
 # Run the setup
 setup_ssh_agent
+
+# If we're starting or attaching to tmux, ensure environment is updated
+if [ -n "$TMUX" ]; then
+    # Force tmux to update its environment from the parent shell
+    eval $(tmux show-environment -s)
+    # Update tmux with our current environment
+    update_tmux_env
+fi
