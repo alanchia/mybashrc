@@ -104,10 +104,38 @@ if [ -n "$TMUX" ]; then
     fi
 fi
 
-# Fix SSH agent even outside tmux (for VS Code or direct shells)
+# -------------------------------------------------------------------
+# Fix SSH agent even outside tmux (for VS Code Remote-SSH or plain SSH shells)
+#
+# Background:
+# - When you SSH with agent forwarding (-A), the server creates a temporary
+#   UNIX socket under /tmp/ssh-*/agent.<pid>.
+# - That socket disappears when the SSH session ends, and a new one is created
+#   the next time you connect.
+# - VS Code Remote-SSH opens its own shell (not tmux), so it may not inherit
+#   the right SSH_AUTH_SOCK. This block fixes that case.
+# -------------------------------------------------------------------
+
+# Check if this shell is running inside an SSH connection.
+# $SSH_CONNECTION is set automatically when you log in over SSH.
+# Also check that we are NOT inside tmux ($TMUX unset), because tmux
+# has its own environment handling (handled in the other snippet).
 if [ -n "$SSH_CONNECTION" ] && [ -z "$TMUX" ]; then
+
+    # Search under /tmp/ssh-* for sockets (-type s) owned by this user.
+    # "find" will return all possible candidate sockets. 
+    # We take the first one (head -n 1).
+    #
+    # Example result: /tmp/ssh-XXXXabcd/agent.12345
     NEW_SOCK=$(find /tmp/ssh-* -type s -user "$USER" 2>/dev/null | head -n 1)
+
+    # Only proceed if:
+    # - NEW_SOCK is not empty (-n "$NEW_SOCK")
+    # - NEW_SOCK points to a valid socket file (-S "$NEW_SOCK")
     if [ -n "$NEW_SOCK" ] && [ -S "$NEW_SOCK" ]; then
+
+        # Export this socket path as SSH_AUTH_SOCK so that ssh, ssh-add,
+        # git over SSH, etc. will use the forwarded agent correctly.
         export SSH_AUTH_SOCK="$NEW_SOCK"
     fi
 fi
