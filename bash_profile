@@ -69,15 +69,45 @@ set_bash_prompt() {
 
 PROMPT_COMMAND=set_bash_prompt
 
-if [ -f "$HOME/.bash_aliases" ]; then
-  . $HOME/.bash_aliases 
-fi
-
-if [ -f "$HOME/.bash_ssh" ]; then
-  . $HOME/.bash_ssh
-fi
+# if [ -f "$HOME/.bash_ssh" ]; then
+#   . $HOME/.bash_ssh
+# fi
 
 if [ -f "$HOME/.bash_aliases" ]; then
   . $HOME/.bash_aliases
 fi
 
+# Always resync SSH_AUTH_SOCK from tmux if inside a tmux session
+
+# Check if we are currently inside a tmux session.
+# The environment variable $TMUX is automatically set by tmux when you attach.
+if [ -n "$TMUX" ]; then
+
+    # Ask tmux what it thinks SSH_AUTH_SOCK is in its global environment.
+    # "tmux show-environment -g SSH_AUTH_SOCK" prints something like:
+    #   SSH_AUTH_SOCK=/tmp/ssh-XXXXabcd/agent.12345
+    #
+    # The `cut -d= -f2` removes the "SSH_AUTH_SOCK=" prefix,
+    # leaving only the socket path (/tmp/ssh-XXXXabcd/agent.12345).
+    #
+    # `2>/dev/null` hides errors in case tmux doesn’t have SSH_AUTH_SOCK set.
+    NEW_SOCK="$(tmux show-environment -g SSH_AUTH_SOCK 2>/dev/null | cut -d= -f2)"
+
+    # Make sure NEW_SOCK is valid before using it.
+    # -n "$NEW_SOCK"   → check the variable isn’t empty.
+    # -S "$NEW_SOCK"   → check that the path points to a socket file that actually exists.
+    if [ -n "$NEW_SOCK" ] && [ -S "$NEW_SOCK" ]; then
+
+        # Update the current shell’s SSH_AUTH_SOCK to the new value.
+        # This ensures that ssh, ssh-add, git, etc. will talk to the correct agent.
+        export SSH_AUTH_SOCK="$NEW_SOCK"
+    fi
+fi
+
+# Fix SSH agent even outside tmux (for VS Code or direct shells)
+if [ -n "$SSH_CONNECTION" ] && [ -z "$TMUX" ]; then
+    NEW_SOCK=$(find /tmp/ssh-* -type s -user "$USER" 2>/dev/null | head -n 1)
+    if [ -n "$NEW_SOCK" ] && [ -S "$NEW_SOCK" ]; then
+        export SSH_AUTH_SOCK="$NEW_SOCK"
+    fi
+fi

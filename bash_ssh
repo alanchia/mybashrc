@@ -34,8 +34,8 @@ find_ssh_agent() {
     # Check common socket locations
     # First try to get the saved socket path
     local saved_sock=""
-    if [ -f "$HOME/.ssh/agent/ssh-auth-sock" ]; then
-        saved_sock=$(cat "$HOME/.ssh/agent/ssh-auth-sock")
+    if [ -f "$HOME/.ssh/ssh_auth_sock" ]; then
+        saved_sock=$(cat "$HOME/.ssh/ssh_auth_sock")
         debug "Found saved socket path: $saved_sock"
     fi
     
@@ -104,11 +104,11 @@ setup_ssh_agent() {
     debug "Starting setup_ssh_agent"
     
     # Create a persistent directory for SSH agent socket
-    mkdir -p "$HOME/.ssh/agent"
+    mkdir -p "$HOME/.ssh"
     
     # If we're reconnecting and have a saved socket, try that first
-    if [ -f "$HOME/.ssh/agent/ssh-auth-sock" ]; then
-        saved_sock=$(cat "$HOME/.ssh/agent/ssh-auth-sock")
+    if [ -f "$HOME/.ssh/ssh_auth_sock" ]; then
+        saved_sock=$(cat "$HOME/.ssh/ssh_auth_sock")
         debug "Found saved socket: $saved_sock"
         if [ -S "$saved_sock" ]; then
             debug "Testing saved socket"
@@ -129,7 +129,8 @@ setup_ssh_agent() {
             ssh-add -l >/dev/null 2>&1
             if [ $? -ne 2 ]; then
                 debug "Current SSH_AUTH_SOCK is working"
-                echo "$SSH_AUTH_SOCK" > "$HOME/.ssh/agent/ssh-auth-sock"
+                #echo "$SSH_AUTH_SOCK" > "$HOME/.ssh/ssh_auth_sock"
+                ln -s $SSH_AUTH_SOCK $HOME/.ssh/ssh_auth_sock
                 export SSH_AUTH_SOCK
                 update_tmux_env
                 return 0
@@ -141,7 +142,7 @@ setup_ssh_agent() {
     if [ -n "$SSH_CONNECTION" ] && [ -n "$SSH_AUTH_SOCK" ]; then
         debug "SSH connection detected with auth sock: $SSH_AUTH_SOCK"
         # Save the socket path to a persistent location
-        echo "$SSH_AUTH_SOCK" > "$HOME/.ssh/agent/ssh-auth-sock"
+        echo "$SSH_AUTH_SOCK" > "$HOME/.ssh/ssh_auth_sock"
         # Update tmux environment if we're in tmux
         if [ -n "$TMUX" ]; then
             debug "Updating tmux SSH_AUTH_SOCK"
@@ -189,11 +190,11 @@ setup_ssh_agent() {
 # Clean up stale socket files
 cleanup_stale_sockets() {
     debug "Cleaning up stale socket files"
-    if [ -f "$HOME/.ssh/agent/ssh-auth-sock" ]; then
-        local saved_sock=$(cat "$HOME/.ssh/agent/ssh-auth-sock")
+    if [ -f "$HOME/.ssh/ssh_auth_sock" ]; then
+        local saved_sock=$(cat "$HOME/.ssh/ssh_auth_sock")
         if [ ! -S "$saved_sock" ]; then
             debug "Removing stale socket reference"
-            rm -f "$HOME/.ssh/agent/ssh-auth-sock"
+            rm -f "$HOME/.ssh/ssh_auth_sock"
         fi
     fi
 }
