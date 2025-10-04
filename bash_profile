@@ -69,13 +69,17 @@ set_bash_prompt() {
 
 PROMPT_COMMAND=set_bash_prompt
 
-# if [ -f "$HOME/.bash_ssh" ]; then
-#   . $HOME/.bash_ssh
-# fi
+if [ -f "$HOME/.bash_ssh" ]; then
+  . $HOME/.bash_ssh
+fi
 
 if [ -f "$HOME/.bash_aliases" ]; then
   . $HOME/.bash_aliases
 fi
+
+if [ -f "$HOME/.bash_screensize" ]; then 
+  . $HOME/.bash_screensize
+fi 
 
 # Always resync SSH_AUTH_SOCK from tmux if inside a tmux session
 
@@ -141,6 +145,3 @@ if [ -n "$SSH_CONNECTION" ] && [ -z "$TMUX" ]; then
 fi
 
 
-if [ -f "$HOME/.bash_screensize" ]; then 
-	. $HOME/.bash_screensize
-fi 

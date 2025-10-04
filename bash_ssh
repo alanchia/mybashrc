@@ -1,0 +1,33 @@
+# ~/.bash_ssh
+# Keep SSH_AUTH_SOCK consistent across tmux and shell sessions
+# Use a stable symlink ~/.ssh/ssh_auth_sock
+
+# Ensure ~/.ssh exists
+mkdir -p ~/.ssh
+
+link="$HOME/.ssh/ssh_auth_sock"
+
+# Helper: check if a socket is usable
+check_agent() {
+    local sock="$1"
+    [ -S "$sock" ] && SSH_AUTH_SOCK="$sock" ssh-add -l >/dev/null 2>&1
+}
+
+# Case 1: Current symlink exists and points to a valid agent → keep it
+if [ -L "$link" ] && check_agent "$link"; then
+    export SSH_AUTH_SOCK="$link"
+    return 0 2>/dev/null || exit 0
+fi
+
+# Case 2: Otherwise, search for a valid socket under /tmp
+for sock in $(find /tmp/ssh-* -type s -user "$USER" 2>/dev/null | sort); do
+    if check_agent "$sock"; then
+        ln -snf "$sock" "$link"
+        export SSH_AUTH_SOCK="$link"
+        return 0 2>/dev/null || exit 0
+    fi
+done
+
+# Case 3: No valid socket found → unset
+unset SSH_AUTH_SOCK
+
