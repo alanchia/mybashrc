@@ -139,3 +139,8 @@ if [ -n "$SSH_CONNECTION" ] && [ -z "$TMUX" ]; then
         export SSH_AUTH_SOCK="$NEW_SOCK"
     fi
 fi
+
+
+if [ -f "$HOME/.bash_screensize" ]; then 
+	. $HOME/.bash_screensize
+fi 
