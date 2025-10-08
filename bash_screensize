@@ -1,0 +1,5 @@
+shopt -s checkwinsize   # makes Bash update after every command
+
+# sync stty with shell vars
+update_stty_size() { stty rows $LINES cols $COLUMNS; }
+PROMPT_COMMAND="update_stty_size; $PROMPT_COMMAND"
