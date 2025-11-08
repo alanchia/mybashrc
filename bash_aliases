@@ -1,6 +1,8 @@
 alias gs="git status"
 alias gad="git add . -A"
+alias gad="git branch "
 alias gci="git commit -m "
+alias gco="git checkout "
 alias gciao="git commit --amend --no-edit"
 alias gfo="git fetch origin"
 alias gp="git push"
